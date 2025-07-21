@@ -254,7 +254,15 @@ func GroupSpans(ctx context.Context, spans []request.Span, traceAttrs map[attr.N
 
 		finalAttrs := TraceAttributes(span, traceAttrs)
 
-		sr := sampler.ShouldSample(trace.SamplingParameters{
+		spanSampler := func() trace.Sampler {
+			if span.Service.Sampler != nil {
+				return span.Service.Sampler
+			}
+
+			return sampler
+		}
+
+		sr := spanSampler().ShouldSample(trace.SamplingParameters{
 			ParentContext: ctx,
 			Name:          span.TraceName(),
 			TraceID:       span.TraceID,
