@@ -72,8 +72,8 @@ func testSampler(t *testing.T) {
 
 		lenC := len(traces)
 
-		require.LessOrEqual(t, lenC, 6)
-		require.LessOrEqual(t, lenC, lenA)
+		require.NotZero(t, lenC)
+		require.Less(t, lenC, lenA)
 	}, test.Interval(1500*time.Millisecond))
 }
 
