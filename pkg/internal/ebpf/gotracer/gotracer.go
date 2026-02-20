@@ -18,7 +18,6 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"strings"
 	"unsafe"
 
 	"github.com/cilium/ebpf"
@@ -29,6 +28,7 @@ import (
 	"go.opentelemetry.io/obi/pkg/appolly/app/request"
 	"go.opentelemetry.io/obi/pkg/appolly/app/svc"
 	"go.opentelemetry.io/obi/pkg/appolly/discover/exec"
+	"go.opentelemetry.io/obi/pkg/appolly/services"
 	"go.opentelemetry.io/obi/pkg/config"
 	ebpfcommon "go.opentelemetry.io/obi/pkg/ebpf/common"
 	"go.opentelemetry.io/obi/pkg/export/imetrics"
@@ -56,7 +56,7 @@ func New(pidFilter ebpfcommon.ServiceFilter, cfg *obi.Config, metrics imetrics.R
 	disabledRouteHarvesting := false
 
 	for _, lang := range cfg.Discovery.DisabledRouteHarvesters {
-		if strings.ToLower(lang) == "go" {
+		if lang == services.RouteHarvesterLanguageGo {
 			disabledRouteHarvesting = true
 			break
 		}
