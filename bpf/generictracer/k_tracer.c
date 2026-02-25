@@ -12,6 +12,7 @@
 #include <common/iov_iter.h>
 #include <common/msg_buffer.h>
 #include <common/dns.h>
+#include <common/protocol_defs.h>
 #include <common/sock_port_ns.h>
 #include <common/sockaddr.h>
 #include <common/ssl_helpers.h>
@@ -24,6 +25,7 @@
 #include <generictracer/maps/active_connect_args.h>
 #include <generictracer/maps/listening_ports.h>
 #include <generictracer/maps/tcp_connection_map.h>
+#include <generictracer/protocol_common.h>
 #include <generictracer/protocol_http.h>
 #include <generictracer/protocol_http2.h>
 #include <generictracer/protocol_mysql.h>
@@ -698,7 +700,7 @@ static __always_inline void setup_recvmsg(u64 id, struct sock *sk, struct msghdr
     // sent through the same socket. This mainly happens if the server overlays virtual
     // threads in the runtime.
     u64 sock_p = (u64)sk;
-    ensure_sent_event(id, &sock_p);
+    ensure_sent_event(id, &sock_p, TCP_RECV);
     connect_ssl_to_sock(id, sk, TCP_RECV);
 
     recv_args_t args = {
@@ -1162,10 +1164,17 @@ int obi_handle_buf_with_args(void *ctx) {
     } else { // large request tracking and generic TCP
         http_info_t *info = bpf_map_lookup_elem(&ongoing_http, &args->pid_conn);
 
+        bpf_d_printk("http info %llx, submitted %d, still reading %d",
+                     info,
+                     (info) ? info->submitted : 0,
+                     (info) ? still_reading(info) : 0);
+
         if (info && !info->submitted) {
+            u8 reading = still_reading(info);
+            u8 responding = still_responding(info);
             // Still reading checks if we are processing buffers of a HTTP request
             // that has started, but we haven't seen a response yet.
-            if (still_reading(info)) {
+            if (reading || responding) {
                 // Packets are split into chunks if OBI injected the Traceparent
                 // Make sure you look for split packets containing the real Traceparent.
                 // Essentially, when a packet is extended by our sock_msg program and
@@ -1175,7 +1184,7 @@ int obi_handle_buf_with_args(void *ctx) {
                 // scan for the incoming 'Traceparent' header. If they are not reassembled
                 // we'll see something like this:
                 // [before the injected header],[70 bytes for 'Traceparent...'],[the rest].
-                if (is_traceparent(args->small_buf)) {
+                if (reading && is_traceparent(args->small_buf)) {
                     unsigned char *buf = tp_char_buf();
                     if (buf) {
                         bpf_probe_read(buf, TP_SIZE, (unsigned char *)args->u_buf);
@@ -1202,17 +1211,25 @@ int obi_handle_buf_with_args(void *ctx) {
                     }
                 }
 
-                http_send_large_buffer(
-                    info,
-                    (void *)args->u_buf,
-                    args->bytes_len,
-                    // Packet type can't be reliably determined in HTTP split packets. This should
-                    // always be a request.
-                    PACKET_TYPE_REQUEST,
-                    args->direction,
-                    k_large_buf_action_append);
-            } else if (still_responding(info)) {
-                info->end_monotime_ns = bpf_ktime_get_ns();
+                u8 packet_type = PACKET_TYPE_REQUEST;
+                if (responding) {
+                    packet_type = PACKET_TYPE_RESPONSE;
+                }
+
+                http_send_large_buffer(info,
+                                       (void *)args->u_buf,
+                                       args->bytes_len,
+                                       packet_type,
+                                       args->direction,
+                                       k_large_buf_action_append);
+
+                if (reading) {
+                    info->len += args->bytes_len;
+                } else if (responding) {
+                    info->end_monotime_ns = bpf_ktime_get_ns();
+                    bpf_d_printk("bytes len %d, new bytes %d", info->resp_len, args->bytes_len);
+                    info->resp_len += args->bytes_len;
+                }
             }
         } else if (!info) {
             // SSL requests will see both TCP traffic and text traffic, ignore the TCP if

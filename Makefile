@@ -507,7 +507,7 @@ itest-coverage-data:
 	# replace the unexpected /src/cmd/obi/main.go file by the module path
 	sed 's/^\/src\/cmd\//github.com\/open-telemetry\/opentelemetry-ebpf-instrumentation\/cmd\//' $(TEST_OUTPUT)/itest-covdata.raw.txt > $(TEST_OUTPUT)/itest-covdata.all.txt
 	# exclude generated files from coverage data
-	grep -vE $(EXCLUDE_COVERAGE_FILES) $(TEST_OUTPUT)/itest-covdata.all.txt > $(TEST_OUTPUT)/itest-covdata.txt
+	grep -vE $(EXCLUDE_COVERAGE_FILES) $(TEST_OUTPUT)/itest-covdata.all.txt > $(TEST_OUTPUT)/itest-covdata.txt || true
 
 .PHONY: oats-prereq
 oats-prereq: $(GINKGO) docker-generate
@@ -538,8 +538,13 @@ oats-test-mongo: oats-prereq
 	mkdir -p internal/test/oats/mongo/$(TEST_OUTPUT)/run
 	cd internal/test/oats/mongo && TESTCASE_TIMEOUT=5m TESTCASE_BASE_PATH=./yaml $(GINKGO) -v -r
 
+.PHONY: oats-test-ai
+oats-test-ai: oats-prereq
+	mkdir -p internal/test/oats/ai/$(TEST_OUTPUT)/run
+	cd internal/test/oats/ai && TESTCASE_TIMEOUT=5m TESTCASE_BASE_PATH=./yaml $(GINKGO) -v -r
+
 .PHONY: oats-test
-oats-test: oats-test-sql oats-test-mongo oats-test-redis oats-test-kafka oats-test-http
+oats-test: oats-test-sql oats-test-mongo oats-test-redis oats-test-kafka oats-test-http oats-test-ai
 	$(MAKE) itest-coverage-data
 
 .PHONY: oats-test-debug
