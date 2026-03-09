@@ -150,7 +150,7 @@ func TestReadN_tooManyBytes_returnsError(t *testing.T) {
 
 	r := lb.NewReader()
 	_, err := r.ReadN(10)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestReadN_zero_returnsNil(t *testing.T) {
@@ -225,7 +225,7 @@ func TestSkip_tooMany_returnsError(t *testing.T) {
 	lb.AppendChunk([]byte("hi"))
 
 	r := lb.NewReader()
-	assert.Error(t, r.Skip(10))
+	require.Error(t, r.Skip(10))
 }
 
 // ── Remaining ────────────────────────────────────────────────────────────────
@@ -1407,4 +1407,132 @@ func TestReadCStr_consecutiveCalls(t *testing.T) {
 	assert.Equal(t, "foo", got1)
 	assert.Equal(t, "bar", got2)
 	assert.Equal(t, 0, r.Remaining())
+}
+
+// ── NewLimitedReader ──────────────────────────────────────────────────────────
+
+func TestNewLimitedReader_remainingRespectsBound(t *testing.T) {
+	// Buffer: "abcdefghij" (10 bytes). Limit reader to [2, 7) → 5 bytes.
+	lb := NewLargeBufferFrom([]byte("abcdefghij"))
+	r, err := lb.NewLimitedReader(2, 7)
+	require.NoError(t, err)
+
+	assert.Equal(t, 5, r.Remaining())
+	assert.Equal(t, 2, r.ReadOffset())
+}
+
+func TestNewLimitedReader_readNBoundedAtEnd(t *testing.T) {
+	lb := NewLargeBufferFrom([]byte("abcdefghij"))
+	r, err := lb.NewLimitedReader(2, 7)
+	require.NoError(t, err)
+
+	got, err := r.ReadN(5)
+	require.NoError(t, err)
+	assert.Equal(t, "cdefg", string(got))
+	assert.Equal(t, 0, r.Remaining())
+
+	// Reading past end must fail.
+	_, err = r.ReadN(1)
+	require.Error(t, err)
+}
+
+func TestNewLimitedReader_skipBoundedAtEnd(t *testing.T) {
+	lb := NewLargeBufferFrom([]byte("abcdefghij"))
+	r, err := lb.NewLimitedReader(2, 5)
+	require.NoError(t, err)
+
+	require.NoError(t, r.Skip(3))
+	assert.Equal(t, 0, r.Remaining())
+
+	require.Error(t, r.Skip(1))
+}
+
+func TestNewLimitedReader_indexByteIgnoresBytesAfterEnd(t *testing.T) {
+	// Buffer: "abc\x00def" — null at offset 3, limit to [0, 3) so it's excluded.
+	lb := NewLargeBufferFrom([]byte("abc\x00def"))
+	r, err := lb.NewLimitedReader(0, 3)
+	require.NoError(t, err)
+
+	assert.Equal(t, -1, r.IndexByte(0))
+}
+
+func TestNewLimitedReader_readCStrBoundedAtEnd(t *testing.T) {
+	// Buffer: "hello\x00world\x00", limit reader to first 5 bytes (no null inside).
+	lb := NewLargeBufferFrom([]byte("hello\x00world\x00"))
+	r, err := lb.NewLimitedReader(0, 5)
+	require.NoError(t, err)
+
+	_, err = r.ReadCStr()
+	require.Error(t, err, "ReadCStr must fail when null terminator is outside the end bound")
+}
+
+func TestNewLimitedReader_readViaIoReader(t *testing.T) {
+	lb := NewLargeBufferFrom([]byte("abcdefghij"))
+	r, err := lb.NewLimitedReader(2, 7)
+	require.NoError(t, err)
+
+	all, err := io.ReadAll(&r)
+	require.NoError(t, err)
+	assert.Equal(t, "cdefg", string(all))
+}
+
+func TestNewLimitedReader_crossChunk(t *testing.T) {
+	lb := NewLargeBuffer()
+	lb.AppendChunk([]byte("abcde"))
+	lb.AppendChunk([]byte("fghij"))
+	// Limit to [3, 8) → "defgh"
+	r, err := lb.NewLimitedReader(3, 8)
+	require.NoError(t, err)
+
+	assert.Equal(t, 5, r.Remaining())
+	got, err := r.ReadN(5)
+	require.NoError(t, err)
+	assert.Equal(t, "defgh", string(got))
+}
+
+func TestNewLimitedReader_emptyWindow(t *testing.T) {
+	// NewLimitedReader(0, 0) must produce a zero-length window, not an unbounded reader.
+	lb := NewLargeBufferFrom([]byte("hello"))
+	r, err := lb.NewLimitedReader(0, 0)
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, r.Remaining())
+	assert.Equal(t, -1, r.IndexByte('h'), "IndexByte must return -1 on empty window")
+	_, err = r.ReadN(1)
+	require.Error(t, err, "ReadN must fail on empty window")
+}
+
+func TestNewLimitedReader_invalidArgs(t *testing.T) {
+	lb := NewLargeBufferFrom([]byte("hello"))
+
+	_, err := lb.NewLimitedReader(-1, 3)
+	require.Error(t, err)
+
+	_, err = lb.NewLimitedReader(3, 2) // end < offset
+	require.Error(t, err)
+
+	_, err = lb.NewLimitedReader(0, 10) // end > Len
+	require.Error(t, err)
+}
+
+func TestNewLimitedReader_zeroAllocs(t *testing.T) {
+	lb := NewLargeBufferFrom([]byte("abcdefghij"))
+	var lastErr error
+
+	allocs := testing.AllocsPerRun(1000, func() {
+		r, err := lb.NewLimitedReader(2, 7)
+		if err != nil {
+			lastErr = err
+			return
+		}
+		b, err := r.ReadN(5)
+		if err != nil {
+			lastErr = err
+			return
+		}
+		_ = b[0]
+	})
+
+	require.NoError(t, lastErr)
+	assert.Zero(t, allocs, "NewLimitedReader must not allocate")
 }
