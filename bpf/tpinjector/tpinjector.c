@@ -134,17 +134,6 @@ static __always_inline void print_tp(const char *msg, const tp_info_t *tp) {
     bpf_dbg_printk("%s: %s", msg, tp_buf_str);
 }
 
-static __always_inline egress_key_t make_key(const connection_info_t *conn) {
-    egress_key_t e_key = {
-        .d_port = conn->d_port,
-        .s_port = conn->s_port,
-    };
-
-    sort_egress_key(&e_key);
-
-    return e_key;
-}
-
 // This is setup here for Go and SSL tracking.
 // Essentially, when the Go or the OpenSSL userspace
 // probes activate for an outgoing HTTP request they setup this
@@ -693,9 +682,8 @@ static __always_inline void handle_existing_tp_pid(struct sk_msg_md *msg,
         if (inject_flags & k_inject_http_headers) {
             write_http_traceparent(msg, tp_pid);
         }
-    } else {
-        clear_tp_info_pid(e_key);
     }
+    clear_tp_info_pid(e_key);
 }
 
 // Sock_msg program which detects packets where it should add space for
@@ -716,7 +704,7 @@ int obi_packet_extender(struct sk_msg_md *msg) {
 
     const u64 id = bpf_get_current_pid_tgid();
     const connection_info_t conn = get_connection_info(msg);
-    const egress_key_t e_key = make_key(&conn);
+    const egress_key_t e_key = make_egress_key(&conn);
 
     t_ctx->p_conn.conn = conn;
     t_ctx->p_conn.pid = pid_from_pid_tgid(id);
