@@ -6,7 +6,6 @@
 #include <bpfcore/bpf_helpers.h>
 #include <bpfcore/bpf_endian.h>
 
-#include <common/common.h>
 #include <common/connection_info.h>
 #include <common/egress_key.h>
 #include <common/event_defs.h>
@@ -28,8 +27,11 @@
 
 #include <maps/incoming_trace_map.h>
 #include <maps/msg_buffers.h>
+#include <maps/outgoing_trace_map.h>
 #include <maps/sock_dir.h>
 #include <maps/tp_info_mem.h>
+
+#include <pid/pid.h>
 
 #include <tpinjector/maps/sk_tp_info_pid_map.h>
 
