@@ -161,6 +161,14 @@ discovery:
 							"/query/service",
 						},
 					},
+					Enrichment: config.EnrichmentConfig{
+						Policy: config.HTTPParsingPolicy{
+							DefaultAction:     config.HTTPParsingActionExclude,
+							MatchOrder:        config.HTTPParsingMatchOrderFirstMatchWins,
+							ObfuscationString: "***",
+						},
+						Rules: []config.HTTPParsingRule{},
+					},
 				},
 			},
 			LogEnricher: config.LogEnricherConfig{

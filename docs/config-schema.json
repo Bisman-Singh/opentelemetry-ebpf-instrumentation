@@ -465,6 +465,28 @@
       },
       "type": "object"
     },
+    "EnrichmentConfig": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable HTTP header and payload enrichment",
+          "x-env-var": "OTEL_EBPF_HTTP_ENRICHMENT_ENABLED"
+        },
+        "policy": {
+          "$ref": "#/$defs/HTTPParsingPolicy",
+          "description": "Policy controls the default behavior and matching strategy"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/HTTPParsingRule"
+          },
+          "type": "array",
+          "description": "Rules is an ordered list of include/exclude/obfuscate rules. Rules are evaluated according to Policy.MatchOrder."
+        }
+      },
+      "type": "object",
+      "description": "EnrichmentConfig configures HTTP header and payload extraction with policy-based rules."
+    },
     "ExportModes": {
       "items": {
         "type": "string",
@@ -680,6 +702,10 @@
           "$ref": "#/$defs/ElasticsearchConfig",
           "description": "Elasticsearch payload extraction and parsing"
         },
+        "enrichment": {
+          "$ref": "#/$defs/EnrichmentConfig",
+          "description": "Enrichment configures HTTP header and payload extraction with policy-based rules"
+        },
         "graphql": {
           "$ref": "#/$defs/GraphQLConfig",
           "description": "GraphQL payload extraction and parsing"
@@ -694,6 +720,94 @@
         }
       },
       "type": "object"
+    },
+    "HTTPParsingAction": {
+      "type": "string",
+      "enum": [
+        "exclude",
+        "include",
+        "obfuscate"
+      ]
+    },
+    "HTTPParsingMatch": {
+      "properties": {
+        "case_sensitive": {
+          "type": "boolean",
+          "description": "CaseSensitive controls whether matching is case-sensitive."
+        },
+        "patterns": {
+          "items": {
+            "$ref": "#/$defs/GlobAttr"
+          },
+          "type": "array",
+          "description": "Patterns is a list of glob patterns to match the rule against"
+        }
+      },
+      "type": "object",
+      "description": "HTTPParsingMatch defines matching criteria for an HTTP parsing rule."
+    },
+    "HTTPParsingMatchOrder": {
+      "type": "string",
+      "enum": [
+        "first_match_wins"
+      ]
+    },
+    "HTTPParsingPolicy": {
+      "properties": {
+        "default_action": {
+          "$ref": "#/$defs/HTTPParsingAction",
+          "description": "DefaultAction specifies what to do when no rule matches: \"include\" or \"exclude\"",
+          "x-env-var": "OTEL_EBPF_HTTP_ENRICHMENT_DEFAULT_ACTION"
+        },
+        "match_order": {
+          "$ref": "#/$defs/HTTPParsingMatchOrder",
+          "description": "MatchOrder controls how rules are evaluated: \"first_match_wins\"",
+          "x-env-var": "OTEL_EBPF_HTTP_ENRICHMENT_MATCH_ORDER"
+        },
+        "obfuscation_string": {
+          "type": "string",
+          "description": "ObfuscationString is the replacement string used when a rule's action is \"obfuscate\"",
+          "x-env-var": "OTEL_EBPF_HTTP_ENRICHMENT_OBFUSCATION_STRING"
+        }
+      },
+      "type": "object",
+      "description": "HTTPParsingPolicy defines the default action and match strategy for http enrichment rules."
+    },
+    "HTTPParsingRule": {
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/HTTPParsingAction",
+          "description": "Action of the rule: \"include\", \"exclude\", or \"obfuscate\""
+        },
+        "match": {
+          "$ref": "#/$defs/HTTPParsingMatch",
+          "description": "Match defines the matching criteria for this rule"
+        },
+        "scope": {
+          "$ref": "#/$defs/HTTPParsingScope",
+          "description": "Scope of the rule: \"request\", \"response\", or \"all\""
+        },
+        "type": {
+          "$ref": "#/$defs/HTTPParsingRuleType",
+          "description": "Type specifies what this rule matches against: \"headers\""
+        }
+      },
+      "type": "object",
+      "description": "HTTPParsingRule defines a single include/exclude/obfuscate rule for HTTP header and payload extraction."
+    },
+    "HTTPParsingRuleType": {
+      "type": "string",
+      "enum": [
+        "headers"
+      ]
+    },
+    "HTTPParsingScope": {
+      "type": "string",
+      "enum": [
+        "all",
+        "request",
+        "response"
+      ]
     },
     "HostIDConfig": {
       "properties": {
