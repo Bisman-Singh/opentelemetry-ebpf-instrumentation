@@ -54,6 +54,20 @@ struct {
     __type(value, flow_metrics);
 } aggregated_flows SEC(".maps");
 
+typedef struct packet_count_t {
+    u64 total;
+    u64 ignored;
+} packet_count;
+
+// Accounts the proportion of packets not reaching the userspace due to an error
+// in the allocation/update of direct_flows or aggregated_flows
+struct {
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __type(key, u32);
+    __type(value, packet_count);
+    __uint(max_entries, 1);
+} flow_packet_stats SEC(".maps");
+
 // Key: the flow identifier. Value: the flow direction.
 struct {
     __uint(type, BPF_MAP_TYPE_LRU_HASH);
