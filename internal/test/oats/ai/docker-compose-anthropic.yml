@@ -1,23 +1,23 @@
 version: "3.9"
 services:
-  openai:
+  anthropic:
     build:
-      context: ../../integration/components/ai/openai/mock-server
+      context: ../../integration/components/ai/anthropic/mock-server
       dockerfile: Dockerfile
-    image: openai
+    image: anthropic
     ports:
-      - "8081:8081"
+      - "8082:8082"
   testserver:
     build:
-      context: ../../integration/components/ai/openai
+      context: ../../integration/components/ai/anthropic
       dockerfile: Dockerfile
     image: testserver
     ports:
-      - "8080:8080"
+      - "8080:8081"
     environment:
-      OPENAI_BASE_URL: "http://openai:8081"
+      ANTHROPIC_BASE_URL: "http://anthropic:8082"
     depends_on:
-      openai:
+      anthropic:
         condition: service_started
   # eBPF auto instrumenter
   autoinstrumenter:
@@ -37,7 +37,7 @@ services:
     pid: "service:testserver"
     environment:
       GOCOVERDIR: "/coverage"
-      OTEL_EBPF_OPEN_PORT: 8080
+      OTEL_EBPF_OPEN_PORT: 8081
       OTEL_EBPF_OTLP_TRACES_BATCH_TIMEOUT: "1ms"
       OTEL_EBPF_SERVICE_NAMESPACE: "integration-test"
       OTEL_EBPF_METRICS_INTERVAL: "10ms"
