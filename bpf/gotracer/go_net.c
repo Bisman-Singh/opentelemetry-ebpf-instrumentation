@@ -165,7 +165,11 @@ int obi_uprobe_netFdRead(struct pt_regs *ctx) {
     net_args_t net_args = {
         .byte_ptr = (u64)byte_addr,
     };
-    get_conn_info_from_fd(fd_ptr, &net_args.p_conn.conn, false);
+
+    if (!get_conn_info_from_fd(fd_ptr, &net_args.p_conn.conn, false)) {
+        return 0;
+    }
+
     net_args.p_conn.pid = pid_from_pid_tgid(id);
 
     dbg_print_http_connection_info(&net_args.p_conn.conn);
@@ -274,6 +278,37 @@ int obi_uprobe_netFdWrite(struct pt_regs *ctx) {
                                        TCP_SEND,
                                        orig_dport);
     }
+
+    return 0;
+}
+
+SEC("uprobe/netFdClose")
+int obi_uprobe_netFdClose(struct pt_regs *ctx) {
+    void *goroutine_addr = GOROUTINE_PTR(ctx);
+    bpf_dbg_printk("=== uprobe/proc netFD close goroutine %lx === ", goroutine_addr);
+
+    go_addr_key_t g_key = {};
+    go_addr_key_from_id(&g_key, goroutine_addr);
+
+    remove_go_handled_goroutine(&g_key);
+
+    void *fd_ptr = GO_PARAM1(ctx);
+
+    if (!fd_ptr) {
+        return 0;
+    }
+
+    connection_info_t conn = {0};
+
+    if (!get_conn_info_from_fd(fd_ptr, &conn, false)) {
+        return 0;
+    }
+
+    sort_connection_info(&conn);
+
+    dbg_print_http_connection_info(&conn);
+
+    remove_go_handled_connection(&conn);
 
     return 0;
 }
