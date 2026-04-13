@@ -169,6 +169,9 @@ var DefaultConfig = Config{
 					Anthropic: config.AnthropicConfig{
 						Enabled: false,
 					},
+					Gemini: config.GeminiConfig{
+						Enabled: false,
+					},
 				},
 				Enrichment: config.EnrichmentConfig{
 					Enabled: false,
