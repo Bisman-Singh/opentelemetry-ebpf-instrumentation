@@ -6,6 +6,8 @@
 package ebpf // import "go.opentelemetry.io/obi/pkg/internal/netolly/ebpf"
 
 import (
+	cebpf "github.com/cilium/ebpf"
+
 	"go.opentelemetry.io/obi/pkg/config"
 	"go.opentelemetry.io/obi/pkg/internal/ebpf/ringbuf"
 	"go.opentelemetry.io/obi/pkg/netolly/flowdef"
@@ -27,6 +29,10 @@ func (s *SockFlowFetcher) ReadRingBuf() (ringbuf.Record, error) {
 
 func (s *SockFlowFetcher) LookupPacketStats() (NetPacketCount, error) {
 	return NetPacketCount{}, ErrTracerTerminated
+}
+
+func (s *SockFlowFetcher) DebugEventsMap() *cebpf.Map {
+	return nil
 }
 
 func NewSockFlowFetcher(
