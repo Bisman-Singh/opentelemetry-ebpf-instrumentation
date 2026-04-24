@@ -19,7 +19,7 @@ RUN ./mvnw -version
 RUN ./mvnw package
 
 # The App Image
-FROM eclipse-temurin:21.0.10_7-jre@sha256:34a58218d838035428163eb35abb629944c5906d1bedcfef8bc8864cce11dfe5
+FROM eclipse-temurin:25.0.2_10-jre@sha256:1089975c9ab22e822faf568c0e03997ee707165a125b7a55fbc799315b63d697
 
 EXPOSE 8080
 
